@@ -4,7 +4,7 @@
 This project provides a ready-to-use Dockerized environment to work with:
 - **Hadoop 3.3.6** (pseudo-distributed)
 - **Spark 3.5.1** (standalone mode)
-- **Kafka 3.6.1** (with Zookeeper)
+- **Kafka 4.0.0** (with Zookeeper)
 - **Python 3** + **PySpark**
 - **Jupyter Notebook**
 
