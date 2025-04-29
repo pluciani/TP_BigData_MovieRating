@@ -14,16 +14,7 @@ services:
       - HADOOP_HOME=/opt/hadoop
       - SPARK_HOME=/opt/spark
       - KAFKA_HOME=/opt/kafka
-      - PATH=/opt/hadoop/bin:/opt/hadoop/sbin:/opt/spark/bin:/opt/spark/sbin:/opt/kafka/bin:$PATH
     volumes:
       - ./config/hadoop:/opt/hadoop/etc/hadoop
-    command: >
-      bash -c "
-        /opt/hadoop/bin/hdfs namenode -format &&
-        /opt/hadoop/sbin/start-dfs.sh &&
-        /opt/hadoop/sbin/start-yarn.sh &&
-        /opt/kafka/bin/zookeeper-server-start.sh /opt/kafka/config/zookeeper.properties &
-        sleep 5 &&
-        /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties &
-        jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --NotebookApp.token='' --NotebookApp.password=''
-      "
+      - ./start-services.sh:/start-services.sh
+    command: ["/bin/bash", "/start-services.sh"]

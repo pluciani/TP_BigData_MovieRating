@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y bash \
     openjdk-11-jdk \
     python3 \
     python3-pip \
@@ -14,7 +14,8 @@ RUN apt-get update && apt-get install -y \
     lsb-release \
     openssh-client \
     openssh-server \
-    && apt-get clean
+    && apt-get clean \
+    && which bash
 
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 ENV PATH=$PATH:$JAVA_HOME/bin
@@ -46,6 +47,7 @@ RUN wget https://downloads.apache.org/kafka/$KAFKA_VERSION/kafka_2.13-$KAFKA_VER
 ENV KAFKA_HOME=/opt/kafka
 ENV PATH=$PATH:$KAFKA_HOME/bin:$PATH
 
+COPY requirements.txt /requirements.txt
 RUN pip3 install --upgrade pip && \
     pip3 install -r /requirements.txt
 
