@@ -70,5 +70,9 @@ jupyter notebook \
   --notebook-dir=/notebooks \
   --no-browser &
 
+
+# Upload automatique vers HDFS
+/upload_to_hdfs.sh
+
 # Keep container alive
 tail -f /dev/null

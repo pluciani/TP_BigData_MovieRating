@@ -29,6 +29,7 @@ services:
       - hadoop_data:/opt/hadoop_data
       - ./config/kafka:/opt/kafka/config
       - ./notebooks:/notebooks
+      - ./data:/data 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9870"]
       interval: 30s

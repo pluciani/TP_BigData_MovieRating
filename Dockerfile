@@ -32,10 +32,10 @@ RUN wget -q https://downloads.apache.org/hadoop/common/hadoop-${HADOOP_VERSION}/
 # Configure Hadoop logging
 RUN mkdir -p $HADOOP_CONF_DIR && \
     echo -e "log4j.rootLogger=INFO, console\n\
-log4j.appender.console=org.apache.log4j.ConsoleAppender\n\
-log4j.appender.console.layout=org.apache.log4j.PatternLayout\n\
-log4j.appender.console.layout.ConversionPattern=%d{ISO8601} %-5p %c{2}:%L - %m%n\n\
-log4j.logger.org.apache.hadoop.util.NativeCodeLoader=ERROR" > $HADOOP_CONF_DIR/log4j.properties
+    log4j.appender.console=org.apache.log4j.ConsoleAppender\n\
+    log4j.appender.console.layout=org.apache.log4j.PatternLayout\n\
+    log4j.appender.console.layout.ConversionPattern=%d{ISO8601} %-5p %c{2}:%L - %m%n\n\
+    log4j.logger.org.apache.hadoop.util.NativeCodeLoader=ERROR" > $HADOOP_CONF_DIR/log4j.properties
 
 # Install Spark
 ENV SPARK_VERSION=3.5.1
@@ -79,9 +79,10 @@ RUN mkdir /var/run/sshd && \
     sed -i 's/UsePAM yes/UsePAM no/' /etc/ssh/sshd_config && \
     echo "StrictHostKeyChecking no" >> /etc/ssh/ssh_config
 
-# Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+COPY upload_to_hdfs.sh /upload_to_hdfs.sh
+RUN chmod +x /upload_to_hdfs.sh
 
 # Expose necessary ports
 EXPOSE 22 8888 9870 8088 8042 19888 9092 2181
