@@ -27,9 +27,9 @@ services:
       - YARN_NODEMANAGER_USER=root
     volumes:
       - hadoop_data:/opt/hadoop_data
-      - ./config/kafka:/opt/kafka/config
+      #- ./config/kafka:/opt/kafka/config
       - ./notebooks:/notebooks
-      - ./data:/data 
+      - ./data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9870"]
       interval: 30s
