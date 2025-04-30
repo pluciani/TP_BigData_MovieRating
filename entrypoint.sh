@@ -53,7 +53,12 @@ $HADOOP_HOME/bin/mapred --daemon start historyserver
 echo "Starting ZooKeeper..."
 $KAFKA_HOME/bin/zookeeper-server-start.sh -daemon $KAFKA_HOME/config/zookeeper.properties
 
-sleep 5
+# Wait for Zookeeper to be ready
+while ! nc -z localhost 2181; do
+  echo "Waiting for Zookeeper to be ready..."
+  sleep 1
+done
+echo "Zookeeper is ready."
 
 echo "Starting Kafka broker..."
 $KAFKA_HOME/bin/kafka-server-start.sh -daemon $KAFKA_HOME/config/server.properties
