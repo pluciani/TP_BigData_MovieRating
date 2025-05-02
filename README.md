@@ -33,6 +33,10 @@ This project provides a ready-to-use Dockerized environment to work with:
     |-- spark_batch_csv_count.py
 ```
 
+## ❗Important Notes
+- Make sure that every file is using **LF** line endings (Unix-style) and not **CRLF** (Windows-style). This is crucial for compatibility with Docker and Linux-based systems.
+- If you encounter issues with line endings, you can convert them using VS Code or other text editors.
+
 ## 🔄 Quick Start
 
 ### 1. Build the Docker Image
