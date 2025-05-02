@@ -8,6 +8,7 @@ up:
 
 down:
 	docker-compose down
+	docker container rm -f $(PROJECT_NAME)
 
 clean:
 	docker-compose down --rmi all --volumes --remove-orphans
