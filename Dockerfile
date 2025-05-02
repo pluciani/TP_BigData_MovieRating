@@ -62,6 +62,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir --upgrade pip && \
     pip3 install --no-cache-dir jupyter && \
     pip3 install --no-cache-dir -r /tmp/requirements.txt && \
+    pip3 install --no-cache-dir streamlit pymongo \
     rm /tmp/requirements.txt
 
 # Create HDFS data directories
@@ -79,13 +80,21 @@ RUN mkdir /var/run/sshd && \
     sed -i 's/UsePAM yes/UsePAM no/' /etc/ssh/sshd_config && \
     echo "StrictHostKeyChecking no" >> /etc/ssh/ssh_config
 
+# Create directory for the Streamlit app and model
+RUN mkdir -p /app/model
+
+# Copy scripts
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 COPY upload_to_hdfs.sh /upload_to_hdfs.sh
 RUN chmod +x /upload_to_hdfs.sh
 
+# Create a script to start Streamlit
+COPY start_streamlit.sh /start_streamlit.sh
+RUN chmod +x /start_streamlit.sh
+
 # Expose necessary ports
-EXPOSE 22 8888 9870 8088 8042 19888 9092 2181
+EXPOSE 22 8888 9870 8088 8042 19888 9092 2181 8501
 
 # Set the entrypoint
 ENTRYPOINT ["/entrypoint.sh"]

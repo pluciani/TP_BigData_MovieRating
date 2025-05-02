@@ -53,12 +53,27 @@ $HADOOP_HOME/bin/mapred --daemon start historyserver
 echo "Starting ZooKeeper..."
 $KAFKA_HOME/bin/zookeeper-server-start.sh -daemon $KAFKA_HOME/config/zookeeper.properties
 
-# Wait for Zookeeper to be ready
-while ! nc -z localhost 2181; do
-  echo "Waiting for Zookeeper to be ready..."
-  sleep 1
+# Wait for Zookeeper to be ready (without using nc)
+echo "Waiting for Zookeeper to be ready..."
+sleep 10  # Wait 10 seconds
+
+timeout=30
+counter=0
+zk_ready=false
+while [ $counter -lt $timeout ] && [ "$zk_ready" = false ]; do
+  if echo stat | timeout 1 bash -c "cat > /dev/tcp/localhost/2181"; then
+    echo "ZooKeeper is ready!"
+    zk_ready=true
+  else
+    echo "Waiting for ZooKeeper... ($counter/$timeout)"
+    counter=$((counter+1))
+    sleep 1
+  fi
 done
-echo "Zookeeper is ready."
+
+if [ "$zk_ready" = false ]; then
+  echo "Warning: ZooKeeper may not be ready after $timeout seconds, but continuing anyway..."
+fi
 
 echo "Starting Kafka broker..."
 $KAFKA_HOME/bin/kafka-server-start.sh -daemon $KAFKA_HOME/config/server.properties
@@ -78,6 +93,14 @@ jupyter notebook \
 
 # Upload automatique vers HDFS
 /upload_to_hdfs.sh
+
+# Démarrer Streamlit en arrière-plan
+if [ -f "/app/app.py" ]; then
+  echo "Démarrage de l'application Streamlit..."
+  nohup /start_streamlit.sh > /var/log/streamlit.log 2>&1 &
+else
+  echo "Aucun fichier app.py trouvé dans /app, Streamlit ne sera pas démarré."
+fi
 
 # Keep container alive
 tail -f /dev/null
