@@ -94,5 +94,13 @@ jupyter notebook \
 # Upload automatique vers HDFS
 /upload_to_hdfs.sh
 
+# Démarrer Streamlit en arrière-plan
+if [ -f "/app/app.py" ]; then
+  echo "Démarrage de l'application Streamlit..."
+  nohup /start_streamlit.sh > /var/log/streamlit.log 2>&1 &
+else
+  echo "Aucun fichier app.py trouvé dans /app, Streamlit ne sera pas démarré."
+fi
+
 # Keep container alive
 tail -f /dev/null
