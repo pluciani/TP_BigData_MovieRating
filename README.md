@@ -69,6 +69,19 @@ make down
 make clean
 ```
 
+## Start Application
+
+### 1. Install Requirements
+```bash
+pip install streamlit pandas pymongo
+```
+
+### 2. Run the Application
+```bash
+cd /app
+streamlit run demo_app.py
+```
+
 ## 📄 Notebooks & Scripts
 - **spark_kafka_demo.ipynb** : Connects Spark Structured Streaming to a Kafka topic and displays the streamed data.
 - **spark_batch_csv_count.py** : A simple Spark batch job reading a CSV file from HDFS and counting rows.
