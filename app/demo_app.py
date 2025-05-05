@@ -2,6 +2,7 @@ import streamlit as st
 import pymongo
 import pandas as pd
 import os
+from bson import ObjectId
 
 # Configuration de la page Streamlit
 st.set_page_config(
@@ -31,45 +32,54 @@ def get_mongo_client():
 
 # Fonction pour récupérer les films avec leurs recommandations
 @st.cache_data(ttl=60)  # Cache de 60 secondes
-def get_recommendations(user_id=None, limit=100):
+def get_recommendations(user_id=None, min_prediction=0, limit=100):
     """Récupère les recommandations de films depuis MongoDB."""
     client = get_mongo_client()
     if not client:
         return pd.DataFrame()
     
     try:
-        db = client["movies_db"]  # Remplacer par le nom de votre base de données
+        db = client["reco_db"]  # Utiliser la base de données "reco_db"
+        collection = db["predictions"]  # Utiliser la collection "predictions"
         
-        # Si vous avez une collection spécifique pour les recommandations
-        if "recommendations" in db.list_collection_names():
-            collection = db["recommendations"]
-            query = {"user_id": user_id} if user_id else {}
-            recommendations = list(collection.find(query).limit(limit))
-            
-            # Conversion en DataFrame pandas
-            if recommendations:
-                return pd.DataFrame(recommendations)
-            else:
-                return pd.DataFrame()
+        # Construire la requête en fonction des paramètres
+        query = {}
+        if user_id is not None:
+            query["user"] = user_id
         
-        # Si vous stockez les recommandations avec les films
-        elif "movies" in db.list_collection_names():
-            collection = db["movies"]
-            movies = list(collection.find({}).limit(limit))
-            
-            if movies:
-                return pd.DataFrame(movies)
-            else:
-                return pd.DataFrame()
+        # Ajouter un filtre sur la prédiction minimale
+        if min_prediction > 0:
+            query["prediction"] = {"$gte": min_prediction}
         
-        # Si vous avez une autre structure
+        # Récupérer les recommandations
+        recommendations = list(collection.find(query).sort("prediction", -1).limit(limit))
+        
+        # Conversion en DataFrame pandas
+        if recommendations:
+            return pd.DataFrame(recommendations)
         else:
-            st.warning("Structure de base de données non reconnue.")
             return pd.DataFrame()
             
     except Exception as e:
         st.error(f"Erreur lors de la récupération des recommandations: {e}")
         return pd.DataFrame()
+
+# Fonction pour récupérer la liste des utilisateurs
+@st.cache_data(ttl=300)  # Cache de 5 minutes
+def get_users():
+    """Récupère la liste des utilisateurs distincts."""
+    client = get_mongo_client()
+    if not client:
+        return []
+    
+    try:
+        db = client["reco_db"]
+        collection = db["predictions"]
+        users = collection.distinct("user")
+        return sorted(users)
+    except Exception as e:
+        st.error(f"Erreur lors de la récupération des utilisateurs: {e}")
+        return []
 
 # Interface utilisateur
 def main():
@@ -84,29 +94,18 @@ def main():
         st.sidebar.error("❌ Non connecté à MongoDB")
         st.stop()
     
-    # Récupérer la liste des utilisateurs si nécessaire
-    try:
-        db = client["movies_db"]
-        if "recommendations" in db.list_collection_names():
-            users = db["recommendations"].distinct("user_id")
-        elif "users" in db.list_collection_names():
-            users = db["users"].distinct("_id")
-        elif "ratings" in db.list_collection_names():
-            users = db["ratings"].distinct("user_id")
-        else:
-            users = []
-    except:
-        users = []
+    # Récupérer la liste des utilisateurs
+    users = get_users()
     
     # Sélection de l'utilisateur si des utilisateurs existent
     user_id = None
     if users:
-        user_id = st.sidebar.selectbox(
+        user_option = st.sidebar.selectbox(
             "Sélectionner un utilisateur",
-            ["Tous les utilisateurs"] + users
+            ["Tous les utilisateurs"] + [f"Utilisateur {user}" for user in users]
         )
-        if user_id == "Tous les utilisateurs":
-            user_id = None
+        if user_option != "Tous les utilisateurs":
+            user_id = int(user_option.split(" ")[1])
     
     # Nombre de recommandations à afficher
     num_recs = st.sidebar.slider(
@@ -116,89 +115,74 @@ def main():
         value=20
     )
     
-    # Filtre par note minimale (si applicable)
-    min_rating = st.sidebar.slider(
-        "Note minimale", 
+    # Filtre par prédiction minimale
+    min_prediction = st.sidebar.slider(
+        "Prédiction minimale", 
         min_value=0.0, 
         max_value=5.0, 
-        value=0.0, 
-        step=0.5
+        value=3.0, 
+        step=0.1
     )
     
     # Récupérer les recommandations
-    recommendations_df = get_recommendations(user_id, limit=num_recs)
+    recommendations_df = get_recommendations(user_id, min_prediction, limit=num_recs)
     
     # Afficher les résultats
     if not recommendations_df.empty:
-        # Déterminer les colonnes à afficher en fonction de ce qui est disponible
-        display_cols = []
+        # Renommer les colonnes pour l'affichage
+        display_df = recommendations_df.copy()
+        if "_id" in display_df.columns:
+            display_df = display_df.drop(columns=["_id"])
         
-        # Colonnes courantes pour l'affichage
-        if "title" in recommendations_df.columns:
-            display_cols.append("title")
-        elif "movie_title" in recommendations_df.columns:
-            display_cols.append("movie_title")
+        # Renommer les colonnes
+        column_mapping = {
+            "user": "Utilisateur",
+            "movie": "ID Film",
+            "title": "Titre",
+            "prediction": "Score prédit"
+        }
+        display_df = display_df.rename(columns=column_mapping)
         
-        if "rating" in recommendations_df.columns:
-            display_cols.append("rating")
-        elif "predicted_rating" in recommendations_df.columns:
-            display_cols.append("predicted_rating")
-        elif "score" in recommendations_df.columns:
-            display_cols.append("score")
-        
-        if "genres" in recommendations_df.columns:
-            display_cols.append("genres")
-        
-        if "year" in recommendations_df.columns:
-            display_cols.append("year")
-        
-        # Filtrer par note minimale si applicable
-        rating_col = None
-        for col in ["rating", "predicted_rating", "score"]:
-            if col in recommendations_df.columns:
-                rating_col = col
-                break
-        
-        if rating_col:
-            filtered_df = recommendations_df[recommendations_df[rating_col] >= min_rating]
-        else:
-            filtered_df = recommendations_df
+        # Arrondir le score prédit à 2 décimales
+        if "Score prédit" in display_df.columns:
+            display_df["Score prédit"] = display_df["Score prédit"].round(2)
         
         # Afficher le nombre de recommandations
-        st.write(f"**{len(filtered_df)}** recommandations trouvées")
+        st.write(f"**{len(display_df)}** recommandations trouvées")
         
         # Afficher le tableau de recommandations
-        if not display_cols:  # Si nous ne savons pas quelles colonnes afficher
-            st.dataframe(filtered_df)
-        else:
-            # Sélectionner et renommer les colonnes pour l'affichage
-            display_df = filtered_df[display_cols].copy()
+        st.dataframe(display_df, use_container_width=True)
+        
+        # Visualisation des données
+        if len(display_df) >= 5 and "Score prédit" in display_df.columns:
+            st.subheader("Distribution des scores prédits")
             
-            # Renommer les colonnes pour un affichage plus convivial
-            column_mapping = {
-                "title": "Titre",
-                "movie_title": "Titre",
-                "rating": "Note",
-                "predicted_rating": "Note prédite",
-                "score": "Score",
-                "genres": "Genres",
-                "year": "Année"
+            # Créer des tranches pour l'histogramme
+            display_df["Tranche de score"] = pd.cut(
+                display_df["Score prédit"], 
+                bins=[0, 1, 2, 3, 4, 5], 
+                labels=["0-1", "1-2", "2-3", "3-4", "4-5"]
+            )
+            
+            # Compter les occurrences dans chaque tranche
+            score_counts = display_df["Tranche de score"].value_counts().sort_index()
+            
+            # Afficher l'histogramme
+            st.bar_chart(score_counts)
+            
+            # Afficher des statistiques sur les scores
+            st.subheader("Statistiques des scores")
+            stats = {
+                "Score moyen": display_df["Score prédit"].mean(),
+                "Score minimum": display_df["Score prédit"].min(),
+                "Score maximum": display_df["Score prédit"].max(),
+                "Écart-type": display_df["Score prédit"].std()
             }
-            
-            display_df = display_df.rename(columns={col: column_mapping.get(col, col) for col in display_cols})
-            
-            # Afficher le tableau
-            st.dataframe(display_df, use_container_width=True)
-            
-            # Visualisation des données si suffisamment de données sont disponibles
-            if rating_col and len(filtered_df) >= 5:
-                st.subheader("Distribution des notes")
-                
-                # Histogramme des notes
-                hist_values = filtered_df[rating_col].value_counts().sort_index()
-                st.bar_chart(hist_values)
+            stats_df = pd.DataFrame(stats.items(), columns=["Statistique", "Valeur"])
+            stats_df["Valeur"] = stats_df["Valeur"].round(2)
+            st.dataframe(stats_df, use_container_width=True)
     else:
-        st.info("Aucune recommandation trouvée. Veuillez vérifier votre connexion MongoDB et la structure de vos données.")
+        st.info("Aucune recommandation trouvée avec les critères sélectionnés.")
         
         # Afficher des informations de débogage
         st.subheader("Informations de débogage")
@@ -206,23 +190,31 @@ def main():
         try:
             client = get_mongo_client()
             if client:
-                db = client["movies_db"]
-                collections = db.list_collection_names()
+                db = client["reco_db"]
                 
-                st.write("Collections disponibles dans la base de données:")
-                for collection in collections:
-                    count = db[collection].count_documents({})
-                    st.write(f"- {collection}: {count} documents")
-                
-                # Montrer un exemple de document pour chaque collection
-                st.write("Exemples de documents:")
-                for collection in collections:
-                    sample = db[collection].find_one()
+                # Vérifier que la collection existe
+                if "predictions" in db.list_collection_names():
+                    count = db["predictions"].count_documents({})
+                    st.write(f"Collection 'predictions': {count} documents")
+                    
+                    # Montrer un exemple de document
+                    sample = db["predictions"].find_one()
                     if sample:
-                        st.write(f"**{collection}**:")
+                        st.write("Exemple de document:")
                         # Convertir les ObjectId en string pour l'affichage
-                        sample_str = {k: str(v) if isinstance(v, pymongo.objectid.ObjectId) else v for k, v in sample.items()}
+                        sample_str = {k: str(v) if isinstance(v, ObjectId) else v for k, v in sample.items()}
                         st.json(sample_str)
+                else:
+                    st.error("La collection 'predictions' n'existe pas dans la base de données 'reco_db'")
+                    
+                    # Afficher les collections disponibles
+                    collections = db.list_collection_names()
+                    if collections:
+                        st.write("Collections disponibles:")
+                        for coll in collections:
+                            st.write(f"- {coll}")
+                    else:
+                        st.write("Aucune collection trouvée dans la base de données 'reco_db'")
         except Exception as e:
             st.error(f"Erreur lors de la récupération des informations de débogage: {e}")
 
